@@ -16,11 +16,15 @@ const getEthereumContract = () => {
 		signer
 	);
 
-	console.log({ provider, signer, transactionContract });
+	return transactionContract;
 };
 
 export const TransactionProvider = ({ children }) => {
 	const [currentAccount, setCurrentAccount] = useState('');
+	const [isLoading, setIsLoading] = useState(false);
+	const [transactionCount, setTransactionCount] = useState(
+		localStorage.getItem('transactionCount')
+	);
 	const [formData, setFormData] = useState({
 		addressTo: '',
 		amount: '',
@@ -71,6 +75,35 @@ export const TransactionProvider = ({ children }) => {
 
 			// get the data from the form
 			const { addressTo, amount, keyword, message } = formData;
+			const transactionContract = getEthereumContract();
+			const parsedAmount = ethers.utils.parseEther(amount);
+
+			await ethereum.request({
+				method: 'eth_sendTransaction',
+				params: [
+					{
+						from: currentAccount,
+						to: addressTo,
+						gas: '0x5208', // 21000 Gwei
+						value: parsedAmount._hex, // 0.00001
+					},
+				],
+			});
+
+			const transactionHash = await transactionContract.addToBlockChain(
+				addressTo,
+				parsedAmount,
+				message,
+				keyword
+			);
+			setIsLoading(true);
+			console.log(`Loading - ${transactionHash.hash}`);
+			await transactionHash.wait();
+			setIsLoading(false);
+			console.log(`Success`);
+
+			const transactionCount = await transactionContract.getTransactionCount();
+			setTransactionCount(transactionCount.toNumber());
 		} catch (error) {
 			console.log(error);
 			throw new Error('No ethereum onject');
